@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import sys
+import itertools
 
 
 def p1(fname):
@@ -18,5 +19,24 @@ def p1(fname):
     return count
 
 
+def p2(fname):
+    with open(fname) as f:
+        meas = map(lambda e: int(e.strip()), f.readlines())
+
+    a, b, c = itertools.tee(iter(meas), 3)
+    next(b)
+    next(c); next(c)
+
+    slidings = [sum(s) for s in zip(a, b, c)]
+    count = 0
+    prev = slidings[0]
+    for s in slidings[1:]:
+        if s > prev:
+            count += 1
+        prev = s
+
+    return count
+
+
 if __name__ == "__main__":
-    print(p1(sys.argv[1]))
+    print(p2(sys.argv[1]))
