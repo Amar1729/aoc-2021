@@ -21,12 +21,27 @@ def p1(lines):
 
 
 def p2(lines):
-    pass
+    aim = 0
+    x = 0
+    z = 0
+
+    for instr in lines:
+        direction, value = instr.strip().split()
+
+        if direction == "forward":
+            x += int(value)
+            z += aim * int(value)
+        elif direction == "down":
+            aim += int(value)
+        elif direction == "up":
+            aim -= int(value)
+
+    return x * z
 
 
 if __name__ == "__main__":
     with open(sys.argv[1]) as f:
         lines = f.readlines()
 
-    print(p1(lines))
-    # print(p2(lines))
+    # print(p1(lines))
+    print(p2(lines))
