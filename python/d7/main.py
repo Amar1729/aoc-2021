@@ -1,6 +1,8 @@
 #! /usr/bin/env python3
 
 import sys
+import math
+from functools import lru_cache
 
 
 def median(numbers):
@@ -9,6 +11,14 @@ def median(numbers):
         return (l[len(l) // 2] + l[len(l) // 2 - 1]) / 2
     else:
         return l[len(l) // 2]
+
+
+@lru_cache
+def triangular(n):
+    if n == 0:
+        return 0
+    else:
+        return sum(i for i in range(n+1))
 
 
 def p1(lines):
@@ -20,12 +30,17 @@ def p1(lines):
 
 
 def p2(lines):
-    pass
+    positions = sorted(list(map(int, lines[0].strip().split(","))))
+
+    avg = sum(positions) / len(positions)
+    fuel_low = sum(triangular(abs(p - math.floor(avg))) for p in positions)
+    fuel_high = sum(triangular(abs(p - math.ceil(avg))) for p in positions)
+    return min(fuel_low, fuel_high)
 
 
 if __name__ == "__main__":
     with open(sys.argv[1]) as f:
         lines = [l.strip() for l in f.readlines()]
 
-    print(p1(lines))
-    # print(p2(lines))
+    # print(p1(lines))
+    print(p2(lines))
