@@ -7,6 +7,7 @@ import functools
 import math
 
 from pprint import pprint
+from statistics import median
 
 
 bad_map = {
@@ -45,7 +46,7 @@ def parse(line):
                 else:
                     return False, (pda[-1], "]")
 
-    return True, (len(pda), 0)
+    return True, (len(pda), pda)
 
 
 def p1(lines):
@@ -57,12 +58,29 @@ def p1(lines):
 
 
 def p2(lines):
-    pass
+    chr_score = {
+        "(": 1,
+        "[": 2,
+        "{": 3,
+        "<": 4,
+    }
+
+    scores = [
+        functools.reduce(
+            lambda x, y: x * 5 + chr_score[y],
+            pda[::-1],
+            0,
+        )
+        for k, (_, pda) in map(parse, lines)
+        if k
+    ]
+
+    return(median(scores))
 
 
 if __name__ == "__main__":
     with open(sys.argv[1]) as f:
         lines = [l.strip() for l in f.readlines()]
 
-    print(p1(lines))
-    # print(p2(lines))
+    # print(p1(lines))
+    print(p2(lines))
