@@ -16,7 +16,7 @@ def print_grid(lines, grid):
         print(st)
 
 
-def p1(lines):
+def p1(lines, p2=False):
     grid = {
         complex(x, y): int(v)
         for y, row in enumerate(lines)
@@ -42,7 +42,16 @@ def p1(lines):
             if p + off in g:
                 yield p + off
 
-    for step in range(100):
+    def itr(p2):
+        if p2:
+            n = 0
+            while True:
+                yield n
+                n += 1
+        else:
+            yield from range(100)
+
+    for step in itr(p2):
         new_grid = {}
         to_flash = set()
         flashed = set()
@@ -68,18 +77,22 @@ def p1(lines):
             if new_grid[p] > 9:
                 new_grid[p] = 0
 
+        if p2:
+            if len(flashed) == len(grid.keys()):
+                return step
+
         grid = new_grid
 
     return num_flashes
 
 
 def p2(lines):
-    pass
+    return p1(lines, True) + 1
 
 
 if __name__ == "__main__":
     with open(sys.argv[1]) as f:
         lines = [l.strip() for l in f.readlines()]
 
-    print(p1(lines))
-    # print(p2(lines))
+    # print(p1(lines))
+    print(p2(lines))
