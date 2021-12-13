@@ -30,16 +30,27 @@ def p1(lines, p2=False):
                 new_d.add((x, y))
 
         d = new_d
-        return len(d)
+        if not p2:
+            return len(d)
+
+    return d
 
 
 def p2(lines):
-    pass
+    d = p1(lines, True)
+
+    max_x = max(d, key=lambda p: p[0])[0]
+    max_y = max(d, key=lambda p: p[1])[1]
+
+    return "\n".join([
+        "".join(map(lambda x: "#" if (x, y) in d else ".", range(max_x + 1)))
+        for y in range(max_y + 1)
+    ])
 
 
 if __name__ == "__main__":
     with open(sys.argv[1]) as f:
         lines = [l.strip() for l in f.readlines()]
 
-    print(p1(lines))
-    # print(p2(lines))
+    # print(p1(lines))
+    print(p2(lines))
