@@ -40,12 +40,33 @@ def p1(lines):
 
 
 def p2(lines):
-    pass
+    # horrendously naive for p1, RIP
+    polymer = lines[0]
+    rules = dict((pair.strip().split(" -> ") for pair in lines[2:]))
+
+    c = collections.Counter(map(str.__add__, polymer, polymer[1:]))
+    num_p = collections.Counter(polymer)
+
+    def step(c):
+        new_c = collections.defaultdict(int)
+        for pair, value in c.items():
+            p = rules[pair]
+            new_c[pair[0] + p] += value
+            new_c[p + pair[1]] += value
+            num_p[p] += value
+
+        return new_c
+
+    for _ in range(40):
+        c = step(c)
+
+    s = sorted(num_p.items(), key=lambda x: x[1], reverse=True)
+    return(s[0][1] - s[-1][1])
 
 
 if __name__ == "__main__":
     with open(sys.argv[1]) as f:
         lines = [l.strip() for l in f.readlines()]
 
-    print(p1(lines))
-    # print(p2(lines))
+    # print(p1(lines))
+    print(p2(lines))
