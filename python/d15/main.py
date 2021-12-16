@@ -17,7 +17,27 @@ def neighbors(point, grid):
             yield p
 
 
-def p1(lines):
+def transform_grid(grid):
+    new_grid = {}
+
+    x_off = max([int(p.real) for p in grid]) + 1
+    y_off = max([int(p.imag) for p in grid]) + 1
+
+    for c, v in grid.items():
+        for x in range(5):
+            for y in range(5):
+                offset = complex(x_off * x, y_off * y)
+                np = c + offset
+                nv = v + x + y
+                while nv > 9:
+                    nv -= 9
+
+                new_grid[np] = nv
+
+    return new_grid
+
+
+def p1(lines, p2=False):
     grid = {
         complex(x, y): int(value)
         for y, row in enumerate(lines)
@@ -26,6 +46,12 @@ def p1(lines):
 
     entry_point = complex(0, 0)
     last_point = complex(len(lines[0])-1, len(lines)-1)
+
+    if p2:
+        grid = transform_grid(grid)
+        x = max([int(p.real) for p in grid]) + 1
+        y = max([int(p.imag) for p in grid]) + 1
+        last_point = complex(x - 1, y - 1)
 
     costs = {}  # keep track of visited -> lowest score, path
     queue = []  # bfs queue
@@ -64,12 +90,12 @@ def p1(lines):
 
 
 def p2(lines):
-    pass
+    return p1(lines, True)
 
 
 if __name__ == "__main__":
     with open(sys.argv[1]) as f:
         lines = [l.strip() for l in f.readlines()]
 
-    print(p1(lines))
-    # print(p2(lines))
+    # print(p1(lines))
+    print(p2(lines))
