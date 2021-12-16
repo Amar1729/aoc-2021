@@ -25,6 +25,33 @@ class Packet:
         # assumes packets wont be modified
         self.version_sum = version + (sum(p.version_sum for p in stuff) if isinstance(stuff, list) else 0)
 
+    def value(self) -> int:
+        if self.type_id == 4:
+            return self.stuff
+        elif self.type_id == 0:
+            # sum
+            return sum(p.value() for p in self.stuff)
+        elif self.type_id == 1:
+            # product
+            return math.prod(p.value() for p in self.stuff)
+        elif self.type_id == 2:
+            # minimum
+            return min(p.value() for p in self.stuff)
+        elif self.type_id == 3:
+            # maximum
+            return max(p.value() for p in self.stuff)
+        elif self.type_id == 5:
+            # >
+            return self.stuff[0].value() > self.stuff[1].value()
+        elif self.type_id == 6:
+            # <
+            return self.stuff[0].value() < self.stuff[1].value()
+        elif self.type_id == 7:
+            # =
+            return self.stuff[0].value() == self.stuff[1].value()
+
+        raise TypeError
+
     def __str__(self):
         return "\n".join([
             str(self.length),
@@ -105,7 +132,7 @@ def parse_packet(s):
     raise TypeError
 
 
-def p1(lines):
+def p1(lines, p2=False):
     input_hex = lines[0]
     input_bin = "".join([
         hex_to_bits(h)
@@ -119,16 +146,19 @@ def p1(lines):
         p, s = parse_packet(s)
         packets.append(p)
 
+    if p2:
+        return packets[0].value()
+
     return sum(p.version_sum for p in packets)
 
 
 def p2(lines):
-    pass
+    return p1(lines, True)
 
 
 if __name__ == "__main__":
     with open(sys.argv[1]) as f:
         lines = [l.strip() for l in f.readlines()]
 
-    print(p1(lines))
-    # print(p2(lines))
+    # print(p1(lines))
+    print(p2(lines))
