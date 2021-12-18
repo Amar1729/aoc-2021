@@ -29,14 +29,16 @@ def vys(vy_i, y_min=-math.inf):
         yield vy
 
 
-def find_yt(py_range, vy):
+def find_yt(py_range, vy):  # (this was broken in p1 oops)
     # finds time t at which starting velocity vy gives position py
-    for t, y in enumerate(vys(vy, py_range[0])):
-        if y in py_range:
+    py = 0
+    for t, vy in enumerate(vys(vy, py_range[0])):
+        if py in py_range:
             yield t
+        py += vy
 
 
-def p1(lines):
+def p1(lines, p2=False):
     tx, ty = lines[0].split(": ")[1].split(", ")
     txi, txf = list(map(int, tx.split("=")[1].split("..")))
     tyi, tyf = list(map(int, ty.split("=")[1].split("..")))
@@ -45,31 +47,39 @@ def p1(lines):
     y_range = range(tyi, tyf + 1)
 
     valid_xs = []
-    for x in range(x_range[-1]):
+    for x in range(x_range[-1]+1):
         if px(x, x) >= x_range[0]:
             valid_xs.append(x)
 
+    min_vy = y_range[0]
     max_vy = abs(y_range[0]) - 1  # smallest y is the first coord
     vy = max_vy
 
-    while True:  # loop until we find a solution
-        print(f"finding: {vy}")
+    velocities = set()
+    while vy >= min_vy:  # loop until we find a solution
+        # print(f"finding: {vy}")
         for t in find_yt(y_range, vy):
             for x in valid_xs:
                 if px(x, t) in x_range:
                     # print(x, vy)
                     # yth triangle number (max height)
-                    return py(vy, vy)
+                    if p2:
+                        velocities.add((x, vy))
+                    else:
+                        return py(vy, vy)
         vy -= 1
+
+    # if p2
+    return velocities
 
 
 def p2(lines):
-    pass
+    return len(p1(lines, True))
 
 
 if __name__ == "__main__":
     with open(sys.argv[1]) as f:
         lines = [l.strip() for l in f.readlines()]
 
-    print(p1(lines))
-    # print(p2(lines))
+    # print(p1(lines))
+    print(p2(lines))
