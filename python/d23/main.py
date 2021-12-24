@@ -39,16 +39,18 @@ def print_pods(pods):
         line2 += pods.get((x, 1), delim)
     print(line2.join("##"))
 
-    line3 = ""
-    for x in range(11):
-        if x in range(2, 10, 2):
-            delim = "."
-        elif x < 1 or x > 9:
-            delim = " "
-        else:
-            delim = "#"
-        line3 += pods.get((x, 2), delim)
-    print(line3.join("  "))
+    for y in range(2, 5):
+        if (y == 2) or (y > 2 and len(pods) > 8):
+            line3 = ""
+            for x in range(11):
+                if x in range(2, 10, 2):
+                    delim = "."
+                elif x < 1 or x > 9:
+                    delim = " "
+                else:
+                    delim = "#"
+                line3 += pods.get((x, y), delim)
+            print(line3.join("  "))
 
     line4 = "#" * 9
     print(line4.join("  ").join("  "))
@@ -68,56 +70,105 @@ def dbg_path(graph, path):
         print("----")
 
 
-def parse_rooms_tuple(lines) -> list[tuple[str, tuple[int, int]]]:
+def parse_rooms_tuple(lines, p2=False) -> list[tuple[str, tuple[int, int]]]:
     positions = {}
     for y in [2, 3]:
         for x, v in enumerate(lines[y][1:-1]):
             if v not in "#. ":
-                positions[(x, y - 1)] = v
+                positions[(x, 4 if p2 and y == 3 else (y - 1))] = v
+
+    # hard-coded extra input for part 2
+    if p2:
+        positions[(2, 2)] = "D"
+        positions[(2, 3)] = "D"
+
+        positions[(4, 2)] = "C"
+        positions[(4, 3)] = "B"
+
+        positions[(6, 2)] = "B"
+        positions[(6, 3)] = "A"
+
+        positions[(8, 2)] = "A"
+        positions[(8, 3)] = "C"
 
     return positions
 
 
-def possible_moves(pods):
+def possible_moves(pods, p2=False):
 
-    def all_adjacent(point):
-        if point[1] == 2:
-            if (point[0], 1) in pods:
-                return
+    def all_adjacent(point, p2=False):
+        # check if we can actually get out this room (if we're in a room)
+        if any((point[0], y) in pods for y in range(1, point[1])):
+            return
 
         for itr in [
             # check left
-            range(point[0], -1, -1),
+            range(point[0] - 1, -1, -1),
             # check right
-            range(point[0], 11),
+            range(point[0] + 1, 11),
         ]:
             for x in itr:
                 if (x, 0) != point and (x, 0) in pods:
                     break
 
                 # check rooms
-                if x in range(2, 10, 2):
-                    if point[0] != x and DST[pods[point]] == x and (x, 1) not in pods:
-                        if (x, 2) not in pods:
-                            yield (abs(point[0] - x) + point[1] + 2, (x, 2))
-                        else:
-                            yield (abs(point[0] - x) + point[1] + 1, (x, 1))
+                if point[0] != x and x in range(2, 10, 2):
+                    pod = pods[point]
+                    if DST[pod] == x:
+                        max_y = 0
+                        # this loop works because:
+                        # 1) if any pod other than what's allowed in this room
+                        # is present, it will be found an break the loop
+                        # 2) if the non-full room has only pods allowed in it,
+                        # then the spaces above them will be empty
+                        # 3) if the room is full then no pods will pass the above
+                        # DST[pod] == x check
+                        for cy in range(4 if p2 else 2, 0, -1):
+                            if (x, cy) in pods:
+                                if pods[(x, cy)] != pod:
+                                    max_y = -1
+                                    break
+                            else:
+                                max_y = cy
+                                break
+
+                        if max_y > 0:
+                            yield (abs(point[0] - x) + point[1] + max_y, (x, max_y))
 
                 # check hallway
                 else:
-                    yield (abs(point[0] - x) + point[1], (x, 0))
+                    # can only move into hallway if we were in a room first
+                    if point[1] > 0:
+                        yield (abs(point[0] - x) + point[1], (x, 0))
+
+    def column_required_move(point: tuple[int, int], p2: bool) -> bool:
+        # check whether a given pod point needs to move out of its column
+        # does not need to if it's at the bottom/above others of its type
+        # in its destination column (does need to otherwise)
+        pod = pods[point]
+        y = point[1]
+
+        # need to move if not in the right room
+        if DST[pod] != point[0]:
+            return True
+
+        # if we're in destination room at maximum column value we're good
+        if (p2 and y == 4) or (not p2 and y == 2):
+            return False
+
+        # check if there's anything not of this room below this pod
+        below = range(y + 1, 5) if p2 else range(y + 1, 3)
+        below_points = map(lambda iy: (point[0], iy), below)
+        if any(p in pods and pods[p] != pod for p in below_points):
+            return True
+
+        # no move required!
+        return False
 
     for pos, pod in pods.items():
-        if DST[pod] == pos[0]:
-            # don't re-check pods that are where they're supposed to be
-            if pos[1] == 2:
-                continue
-
-            if pos[1] == 1 and pods[(pos[0], 2)] == pod:
-                continue
-
-        for cost, dst in all_adjacent(pos):
-            yield (cost * COST[pod], pod, dst, pos)
+        if column_required_move(pos, p2):
+            for cost, dst in all_adjacent(pos, p2):
+                yield (cost * COST[pod], pod, dst, pos)
 
 
 def hashed(d):
@@ -125,26 +176,31 @@ def hashed(d):
     return tuple(sorted(d.items()))
 
 
-def p1(lines):
-    graph = parse_rooms_tuple(lines)
+def p1(lines, p2=False):
+    graph = parse_rooms_tuple(lines, p2)
 
     # print_pods(graph)
 
     # int -> hashed(graph)
-    # keep track of cost it took to get to a particular state (but not the moves?)
+    # keep track of cost it took to get to a particular state
     costs = {}
 
-    # bfs
+    # bfs (stores an array of the moves as well for debugging)
     queue = []
 
     h_d = hashed(graph)
     costs[h_d] = (0, [])
     heappush(queue, (0, h_d, []))
 
+    if p2:
+        rows = range(1, 5)
+    else:
+        rows = range(1, 3)
+
     win_state = hashed({
         tup: pod
         for pod, home in DST.items()
-        for tup in [(home, 1), (home, 2)]
+        for tup in [(home, y) for y in rows]
     })
 
     while queue:
@@ -153,7 +209,7 @@ def p1(lines):
         if h_graph == win_state:
             continue
 
-        for cost, pod, dst, src in possible_moves(dict(h_graph)):
+        for cost, pod, dst, src in possible_moves(dict(h_graph), p2):
             ng = dict(h_graph)
             del ng[src]
             ng[dst] = pod
@@ -167,7 +223,7 @@ def p1(lines):
                 # re calc
                 n_score = costs[h_graph][0] + cost
                 if n_score < costs[h_ng][0] or costs[h_ng][0] == 0:
-                    costs[h_ng] = (n_score, n_path)  # todo make this tuple right
+                    costs[h_ng] = (n_score, n_path)
                     heappush(queue, (n_score, h_ng, n_path))
 
     score, path = costs[win_state]
@@ -176,11 +232,11 @@ def p1(lines):
 
 
 def p2(lines):
-    pass
+    return p1(lines, True)
 
 
 if __name__ == "__main__":
     lines = open(sys.argv[1]).read().splitlines()
 
-    print(p1(lines))
-    # print(p2(lines))
+    # print(p1(lines))
+    print(p2(lines))
