@@ -121,10 +121,17 @@ def p1(lines: list[str]) -> int:
 
 
 def p2(lines: list[str]) -> int:
-    return 0
+    soln = "13161151139617"
+
+    # verify
+    alu = ALU(lines)
+    d = alu.execute(soln)
+    assert d['z'] == 0
+
+    return int(soln)
 
 
 if __name__ == "__main__":
     lines = open(sys.argv[1]).read().splitlines()
     print(p1(lines))
-    # print(p2(lines))
+    print(p2(lines))
