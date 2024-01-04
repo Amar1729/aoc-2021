@@ -1,13 +1,15 @@
 #! /usr/bin/env python3
 
-import sys
-import collections
-import itertools
-import functools
-import math
+from __future__ import annotations
 
+import copy
+import functools
+import itertools
+import math
+import re
+import sys
 from pprint import pprint
-from typing import List, Tuple
+from typing import Generator, List, Tuple
 
 
 def parse_pairs(ev: list[str], depth: int = 0):
@@ -135,7 +137,259 @@ class Shellfish:
         return "[" + st[:-1] + "]"
 
 
+class Number:
+    """Implementation of Snailfish numbers.
+
+    The above "Shellfish" implementation was built as a list of tuples, and it sort of works but
+    isn't ergonomic to read/modify. This one is a bit more verbose but more accurately reflects
+    what's actually happening in the problem statement.
+    """
+
+    def __init__(self, left: Number | int, right: Number | int, parent: Number | None = None):
+        self.left = left
+        self.right = right
+        self.parent = parent
+
+        # if user is manually creating a nested number, make sure to resolve parents.
+        if not isinstance(left, int) or not isinstance(right, int):
+            self.resolve_parents()
+
+    def resolve_parents(self, parent: Number | None = None):
+        self.parent = parent
+
+        if isinstance(self.left, Number):
+            self.left.resolve_parents(self)
+
+        if isinstance(self.right, Number):
+            self.right.resolve_parents(self)
+
+    @staticmethod
+    def _parse(line: str) -> tuple[Number, str]:
+        left: Number | int
+        right: Number | int
+
+        # base case
+        m = re.match(r"\[([0-9]+),([0-9]+)\]", line)
+        if m:
+            left = int(m.group(1))
+            right = int(m.group(2))
+            return Number(left, right), line[m.end():]
+
+        assert line[0] == "["  # ]
+
+        if line[1].isdigit():
+            m = re.match(r"[0-9]+,", line[1:])
+            assert m is not None
+            left = int(m.group().rstrip(","))
+            rem = line[1 + m.end():]
+        else:
+            left, rem = Number._parse(line[1:])
+            assert rem[0] == ","
+            rem = rem[1:]
+
+        if rem[0].isdigit():
+            m = re.match(r"[0-9]+", rem)
+            assert m is not None
+            right = int(m.group())
+            rem = rem[m.end():]
+        else:
+            right, rem = Number._parse(rem)
+
+        assert rem[0] == "]"
+        rem = rem[1:]
+
+        return Number(left, right), rem
+
+    @staticmethod
+    def from_str(line: str) -> Number:
+        left, rem = Number._parse(line)
+
+        if rem:
+            assert rem[0] == ","
+            rem = rem[1:]
+            right, rem = Number._parse(rem)
+
+            # hm.
+            if rem == "]":
+                rem = ""
+
+            num = Number(left, right)
+        else:
+            num = left
+
+        if rem:
+            raise ValueError(rem)
+
+        num.resolve_parents()
+        return num
+
+    @staticmethod
+    def gen_split(x: int) -> Number:
+        # rounded down
+        left = x // 2
+        # rounded up
+        right = (x + 1) // 2
+        return Number(left, right)
+
+    def __add__(self, other: Number) -> Number:
+        num = Number(copy.deepcopy(self), copy.deepcopy(other))
+        assert isinstance(num.left, Number)
+        assert isinstance(num.right, Number)
+        num.left.parent = num
+        num.right.parent = num
+
+        # print("Before mutate:", num)
+
+        # merge/split
+        while num.explode() or num.split():
+            # print("after mutate:", num)
+            pass
+
+        return num
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, Number):
+            return False
+
+        if self.parent is not None and other.parent is not None:
+            pass
+        elif self.parent is None and other.parent is None:
+            pass
+        else:
+            return False
+
+        return self.left == other.left and self.right == self.right
+
+    def __iter__(self) -> Generator[tuple[Number | None, Number | int], None, None]:
+        """Iterate over the parents and values in a Number."""
+        if isinstance(self.left, int) and isinstance(self.right, int):
+            yield self.parent, self
+            # done
+            return
+
+        if isinstance(self.left, Number):
+            yield from iter(self.left)
+        else:
+            yield self, self.left
+
+        if isinstance(self.right, Number):
+            yield from iter(self.right)
+        else:
+            yield self, self.right
+
+    def __str__(self) -> str:
+        # no space, to reflect input format.
+        return f"[{self.left},{self.right}]"
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    def depth(self) -> int:
+        c = 0
+        parent = self.parent
+        while parent is not None:
+            parent = parent.parent
+            c += 1
+        return c
+
+    def window(self):
+        """Sliding window of three int/Numbers over iter(self)."""
+        it = itertools.chain([(None, None)], iter(self), [(None, None)])
+        a, b, c = itertools.tee(it, 3)
+        next(c)
+        next(c)
+        next(b)
+
+        yield from zip(a, b, c)
+
+    def assign_of(self, val: Number | int, new_val: Number | int, from_left: bool):
+        """Kind of gross: change a particular value in a Number.
+
+        I didn't encode a way to tell whether a particular value is the left or right attribute,
+        so I have to do this weird check over left and right values.
+        """
+        if from_left:
+            if self.left == val:
+                self.left = new_val
+                return
+            if self.right == val:
+                self.right = new_val
+                return
+        else:
+            if self.right == val:
+                self.right = new_val
+                return
+            if self.left == val:
+                self.left = new_val
+                return
+
+        raise ValueError
+
+    def explode(self) -> bool:
+        for (pa, na), (pb, nb), (pc, nc) in self.window():
+            if isinstance(nb, Number) and nb.depth() > 3:
+                x, y = nb.left, nb.right
+                if not isinstance(x, int) or not isinstance(y, int):
+                    raise TypeError(type(x), type(y))
+                assert pb is not None
+                pb.assign_of(nb, -1, True)
+
+                # modify number to left.
+                if pa is not None and isinstance(na, int):
+                    pa.assign_of(na, na + x, False)
+                elif isinstance(na, Number):
+                    assert isinstance(na.right, int)
+                    na.right = na.right + x
+
+                # modify number to right.
+                if pc is not None and isinstance(nc, int):
+                    pc.assign_of(nc, nc + y, True)
+                elif isinstance(nc, Number):
+                    assert isinstance(nc.left, int)
+                    nc.left = nc.left + y
+
+                pb.assign_of(-1, 0, True)
+
+                return True
+
+        return False
+
+    def split(self) -> bool:
+        for pb, nb in self:
+
+            if isinstance(nb, int) and nb >= 10:
+                assert pb is not None
+                new_num = Number.gen_split(nb)
+                new_num.parent = pb
+                pb.assign_of(nb, new_num, True)
+                return True
+
+            if isinstance(nb, Number) and isinstance(nb.left, int) and nb.left >= 10:
+                new_num = Number.gen_split(nb.left)
+                new_num.parent = nb
+                nb.left = new_num
+                return True
+
+            if isinstance(nb, Number) and isinstance(nb.right, int) and nb.right >= 10:
+                new_num = Number.gen_split(nb.right)
+                new_num.parent = nb
+                nb.right = new_num
+                return True
+
+        return False
+
+    def magnitude(self) -> int:
+        m = 3 * (self.left if isinstance(self.left, int) else self.left.magnitude())
+        m += 2 * (self.right if isinstance(self.right, int) else self.right.magnitude())
+        return m
+
+
 def p1(lines):
+    # implemented later for p2 work: proper Snailfish class
+    # snailfish = [Number.from_str(line) for line in lines]
+    # s = functools.reduce(lambda x, y: x + y, snailfish)
+    # return s.magnitude()
+
     shellfish = [Shellfish(line) for line in lines]
     s = functools.reduce(lambda x, y: x + y, shellfish)
     print(s)
@@ -148,13 +402,19 @@ def p1(lines):
     return magnitude(s)
 
 
-def p2(lines):
-    pass
+def p2(lines) -> int:
+    # ez pz (once i have a better way to add snailfish numbers ...)
+    snailfish = [Number.from_str(line) for line in lines]
+
+    return max(
+        (n1 + n2).magnitude()
+        for n1, n2 in itertools.permutations(snailfish, 2)
+    )
 
 
 if __name__ == "__main__":
     with open(sys.argv[1]) as f:
         lines = [l.strip() for l in f.readlines()]
 
-    print(p1(lines))
-    # print(p2(lines))
+    # print(p1(lines))
+    print(p2(lines))
